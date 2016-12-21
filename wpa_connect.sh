@@ -50,7 +50,9 @@ else
 
   echo "scanning..."
 
-  APS=$(iwlist $IFACE scan | egrep 'ESSID:"[^"]*"' | sed 's/\s*ESSID:"\([^"]*\)"\s*/\1/')
+  scan=$(iwlist $IFACE scan)
+  APS=$(echo "$scan" | egrep 'ESSID:"[^"]*"' | sed 's/\s*ESSID:"\([^"]*\)"\s*/\1/')
+  QUALITIES=$(echo "$scan" | egrep '^\s*Quality=' | sed 's/\s*Quality=\([0-9/]*\)\s*.*/\1/')
 
   AP_COUNT=$(echo "$APS" | wc -l)
 
@@ -63,23 +65,29 @@ else
     # check for essids in existing profiles
     FOUND_ESSIDS=""
     FOUND_PROFILES=""
+    FOUND_QUALITIES=""
     FOUND_COUNT=0
 
-    list="$APS"
+    ap_list=$(echo "$APS" | tr '\n' ' ')
+    quality_list=$(echo "$QUALITIES" | tr '\n' ' ')
 
-    while [ ! -z "$list" ]; do
-      cur="${list%% *}"
-      list="${list#$cur}"
-      list="${list# }"
+    while [ ! -z "$ap_list" ]; do
+      ap_cur="${ap_list%% *}"
+      ap_list="${ap_list#$ap_cur}"
+      ap_list="${ap_list# }"
 
-      echo "  $cur"
+      quality_cur="${quality_list%% *}"
+      quality_list="${quality_list#$quality_cur}"
+      quality_list="${quality_list# }"
+
+      echo "  $ap_cur ($quality_cur)"
 
       for f in ${PROFILE_DIR}/* ; do
         profile=$(basename $f)
         profile=${profile%.conf}
         ssid=$(egrep 'ssid="[^"]*"' $f | sed 's/\s*ssid="\([^"]*\)"\s*/\1/')
 
-        if [ "$cur" != "$ssid" ]; then
+        if [ "$ap_cur" != "$ssid" ]; then
           continue
         fi
 
@@ -97,6 +105,12 @@ else
           FOUND_ESSIDS="${FOUND_ESSIDS} $ssid"
         fi
 
+        if [ -z "${FOUND_QUALITIES}" ]; then
+          FOUND_QUALITIES="$quality_cur"
+        else
+          FOUND_QUALITIES="${FOUND_QUALITIES} $quality_cur"
+        fi
+
         FOUND_COUNT=$(expr $FOUND_COUNT + 1)
       done
 
@@ -106,18 +120,23 @@ else
       echo "found 1 network with existing profile"
       PROFILE_NAME="$FOUND_PROFILES"
     else
-      echo "found ${PROFILE_COUNT} networks with existing profile"
+      echo "found ${FOUND_COUNT} networks with existing profiles"
 
-      list="${FOUND_PROFILES}"
+      profile_list="${FOUND_PROFILES}"
+      quality_list="${FOUND_QUALITIES}"
 
       EXEC_STR="dialog --menu \"select network:\" 0 0 0 "
 
-      while [ ! -z "$list" ]; do
-        cur="${list%% *}"
-        list="${list#$cur}"
-        list="${list# }"
+      while [ ! -z "$profile_list" ]; do
+        profile_cur="${profile_list%% *}"
+        profile_list="${profile_list#$profile_cur}"
+        profile_list="${profile_list# }"
 
-        EXEC_STR="${EXEC_STR} \"$cur\" \"\""
+        quality_cur="${quality_list%% *}"
+        quality_list="${quality_list#$quality_cur}"
+        quality_list="${quality_list# }"
+
+        EXEC_STR="${EXEC_STR} \"$profile_cur\" \"$quality_cur\""
       done
 
       EXEC_STR="${EXEC_STR} 3>&1 1>&2 2>&3"
@@ -168,7 +187,7 @@ while true ; do
   # start interface
   ifconfig $IFACE down
   ifconfig $IFACE up
-  
+
   # authenticate
   wpa_supplicant -i $IFACE -c ${WPA_FILE} -qq &
   WPA_PID=$!
