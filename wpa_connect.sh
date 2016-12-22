@@ -38,6 +38,8 @@ if [ ! -z "$2"] ; then
   IFACE="$2"
 fi
 
+echo "using interface $IFACE"
+
 if [ ! -z "$1" ] ; then
   PROFILE_NAME="$1"
   PROFILE="${PROFILE_NAME}.conf"
@@ -160,7 +162,6 @@ if [ ! -f "${PROFILE_FILE}" ] ; then
   exit -1
 fi
 
-echo "using interface $IFACE"
 echo "using profile ${PROFILE_NAME}"
 
 
