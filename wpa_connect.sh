@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # wpa_connect.sh - manage wireless network connections
 #
@@ -115,13 +115,8 @@ if [ -f "${GLOBAL_CFG}" ] ; then
   . ${GLOBAL_CFG}
 fi
 
-if [ ! -z "$3" ] ; then
-  PROFILE_DIR="$2"
-fi
-
-if [ ! -z "$2" ] ; then
-  IFACE="$2"
-fi
+[ ! -z "$3" ] && PROFILE_DIR="$3"
+[ ! -z "$2" ] && IFACE="$2"
 
 if [ -z "${IFACE}" ] || [ -z "${PROFILE_DIR}" ] ; then
   usage
@@ -181,19 +176,13 @@ else
     echo "found ${AP_COUNT} networks, essids:"
 
     # check for essids in existing profiles
-    FOUND_ESSIDS=""
     FOUND_PROFILES=""
-    FOUND_QUALITIES=""
     FOUND_COUNT=0
+    DIALOG_STR=""
 
-    AP_LIST=$(echo "${APS}" | tr '\n' ' ')
     QUALITY_LIST=$(echo "${QUALITIES}" | tr '\n' ' ')
 
-    while [ ! -z "$AP_LIST" ]; do
-      AP_CUR="${AP_LIST%% *}"
-      AP_LIST="${AP_LIST#$AP_CUR}"
-      AP_LIST="${AP_LIST# }"
-
+    while read AP_CUR ; do
       QUALITY_CUR="${QUALITY_LIST%% *}"
       QUALITY_LIST="${QUALITY_LIST#$QUALITY_CUR}"
       QUALITY_LIST="${QUALITY_LIST# }"
@@ -211,28 +200,14 @@ else
 
         # profile found, add to list
 
-        if [ -z "${FOUND_PROFILES}" ]; then
-          FOUND_PROFILES="${PROFILE}"
-        else
-          FOUND_PROFILES="${FOUND_PROFILES} ${PROFILE}"
-        fi
-
-        if [ -z "${FOUND_ESSIDS}" ]; then
-          FOUND_ESSIDS="${SSID}"
-        else
-          FOUND_ESSIDS="${FOUND_ESSIDS} ${SSID}"
-        fi
-
-        if [ -z "${FOUND_QUALITIES}" ]; then
-          FOUND_QUALITIES="${QUALITY_CUR}"
-        else
-          FOUND_QUALITIES="${FOUND_QUALITIES} ${QUALITY_CUR}"
-        fi
+        FOUND_PROFILES="${FOUND_PROFILES}${PROFILE} "
+        DIALOG_STR="${DIALOG_STR} ${PROFILE} ${QUALITY_CUR}"
 
         FOUND_COUNT=$(expr ${FOUND_COUNT} + 1)
       done
+    done <<< "$APS"
 
-    done
+    FOUND_PROFILES="${FOUND_PROFILES% }"
 
     if [ ${FOUND_COUNT} -eq 1 ]; then
       echo "found 1 network with existing profile"
@@ -240,23 +215,8 @@ else
     else
       echo "found ${FOUND_COUNT} networks with existing profiles"
 
-      PROFILE_LIST="${FOUND_PROFILES}"
-      QUALITY_LIST="${FOUND_QUALITIES}"
-
       EXEC_STR="dialog --menu \"select network:\" 0 0 0 "
-
-      while [ ! -z "${PROFILE_LIST}" ]; do
-        PROFILE_CUR="${PROFILE_LIST%% *}"
-        PROFILE_LIST="${PROFILE_LIST#${PROFILE_CUR}}"
-        PROFILE_LIST="${PROFILE_LIST# }"
-
-        QUALITY_CUR="${QUALITY_LIST%% *}"
-        QUALITY_LIST="${QUALITY_LIST#${QUALITY_CUR}}"
-        QUALITY_LIST="${QUALITY_LIST# }"
-
-        EXEC_STR="${EXEC_STR} \"${PROFILE_CUR}\" \"${QUALITY_CUR}\""
-      done
-
+      EXEC_STR="${EXEC_STR} ${DIALOG_STR}"
       EXEC_STR="${EXEC_STR} 3>&1 1>&2 2>&3"
 
       OPT=$(eval ${EXEC_STR})
